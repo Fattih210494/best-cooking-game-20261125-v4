@@ -54,6 +54,7 @@ function makeFace(skin, opts = {}) {
   const s = opts.s || 1;
   const g = new THREE.Group();
   const eyeW = std(0xffffff), eyeB = std(0x1a1a1a);
+  g.userData.brows = [];
   for (const sx of [-1, 1]) {
     if (opts.expr === 'happy' || (opts.expr === 'wink' && sx === 1)) {
       // mata tertutup bahagia: busur
@@ -69,20 +70,30 @@ function makeFace(skin, opts = {}) {
     }
     const b = mesh(new THREE.BoxGeometry(0.17 * s, 0.035 * s, 0.02 * s), std(0x2a1a10), sx * 0.21 * s, 0.22 * s, 0.48 * s);
     b.rotation.z = sx * -0.12; g.add(b);
+    g.userData.brows.push({ m: b, sx });
     const c = mesh(new THREE.SphereGeometry(0.075 * s, 10, 10), std(0xff9d9d), sx * 0.34 * s, -0.08 * s, 0.44 * s);
     c.scale.set(1, 0.7, 0.4); g.add(c);
   }
   g.add(mesh(new THREE.SphereGeometry(0.06 * s, 10, 10), skin, 0, -0.04 * s, 0.52 * s));
+  // mulut senyum + mulut cemberut (tukar saat kesabaran menipis)
+  const smile = mesh(new THREE.TorusGeometry(0.16 * s, 0.028 * s, 8, 16, Math.PI * 0.85), std(0x7a3b22), 0, -0.13 * s, 0.49 * s);
+  smile.rotation.z = Math.PI + (Math.PI - Math.PI * 0.85) / 2;
+  smile.rotation.x = 0.15;
+  g.add(smile);
+  const frown = mesh(new THREE.TorusGeometry(0.14 * s, 0.026 * s, 8, 16, Math.PI * 0.8), std(0x7a3b22), 0, -0.2 * s, 0.49 * s);
+  frown.rotation.z = (Math.PI - Math.PI * 0.8) / 2;
+  frown.rotation.x = 0.15;
+  frown.visible = false;
+  g.add(frown);
   if (opts.expr === 'wow') {
-    // mulut terbuka kaget
+    // mulut terbuka kaget (di atas senyum)
     const mo = mesh(new THREE.SphereGeometry(0.09 * s, 12, 10), std(0x5b2121), 0, -0.16 * s, 0.48 * s);
     mo.scale.set(1, 1.25, 0.5); g.add(mo);
-  } else {
-    const smile = mesh(new THREE.TorusGeometry(0.16 * s, 0.028 * s, 8, 16, Math.PI * 0.85), std(0x7a3b22), 0, -0.13 * s, 0.49 * s);
-    smile.rotation.z = Math.PI + (Math.PI - Math.PI * 0.85) / 2;
-    smile.rotation.x = 0.15;
-    g.add(smile);
+    smile.visible = false;
   }
+  g.userData.smile = smile;
+  g.userData.frown = frown;
+  g.userData.expr = opts.expr || 'smile';
   if (opts.glasses) {
     const ring = std(0x222222, { metalness: 0.4, roughness: 0.4 });
     for (const sx of [-1, 1]) g.add(mesh(new THREE.TorusGeometry(0.16 * s, 0.025 * s, 8, 24), ring, sx * 0.21 * s, 0.06 * s, 0.55 * s));
@@ -112,6 +123,7 @@ function makeCustomer(kind) {
   const face = makeFace(skin, { glasses: kind === 'peci', s: 1.32, expr: exprs[kind] });
   face.position.set(0, 2.08, 0);
   g.add(face);
+  g.userData.face = face;
   if (kind === 'batik') {
     const hair = mesh(new THREE.SphereGeometry(0.58, 20, 16), std(0x2b1a12), 0, 2.3, -0.04);
     hair.scale.set(0.98, 0.72, 0.95);
@@ -183,6 +195,7 @@ function makeChef() {
   const face = makeFace(skin, { s: 1.0, expr: 'happy' });
   face.position.set(0, 1.84, 0);
   g.add(face);
+  g.userData.face = face;
   // topi koki
   g.add(mesh(new THREE.CylinderGeometry(0.4, 0.42, 0.22, 16), std(0xffffff), 0, 2.18, 0));
   const puff = mesh(new THREE.SphereGeometry(0.44, 16, 12), std(0xffffff), 0, 2.38, 0);
@@ -350,9 +363,9 @@ function makeStation(st) {
     const fc = [0xf97316, 0xfbbf24, 0xef4444, 0xf97316, 0xfbbf24];
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2 + 0.4;
-      const cone = mesh(new THREE.ConeGeometry(0.2, 0.85, 8),
+      const cone = mesh(new THREE.ConeGeometry(0.22, 1.05, 8),
         new THREE.MeshStandardMaterial({ color: fc[i], emissive: fc[i], emissiveIntensity: 2.4, transparent: true, opacity: 0.95 }),
-        Math.cos(a) * 0.52, 0.55, Math.sin(a) * 0.42);
+        Math.cos(a) * 0.52, 0.62, Math.sin(a) * 0.42);
       cone.castShadow = false;
       flames.add(cone);
     }
@@ -395,15 +408,27 @@ function makeStation(st) {
     top.add(mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.04, 12), std(0xdc2626, { roughness: 0.3 }), -0.85, 0.12, 0.55));
     top.add(mesh(new THREE.CylinderGeometry(0.14, 0.1, 0.14, 12), std(0x451a03), 0.85, 0.07, 0.55));
     top.add(mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.04, 12), std(0x78350f, { roughness: 0.3 }), 0.85, 0.14, 0.55));
-    // bara menyala
+    // bara menyala + pijar di bawah panggangan
     const coals = new THREE.Group();
     for (let i = 0; i < 8; i++) {
       coals.add(mesh(new THREE.BoxGeometry(0.16, 0.08, 0.12),
-        new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xdc2626, emissiveIntensity: 1.2 }),
+        new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xdc2626, emissiveIntensity: 1.6 }),
         (Math.random() - 0.5) * 1.2, 0.36, (Math.random() - 0.5) * 0.5));
     }
     top.add(coals);
+    const coalGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: canvasTex(128, 128, (c) => {
+        const gr = c.createRadialGradient(64, 64, 4, 64, 64, 62);
+        gr.addColorStop(0, 'rgba(255,90,0,0.85)');
+        gr.addColorStop(1, 'rgba(255,90,0,0)');
+        c.fillStyle = gr; c.fillRect(0, 0, 128, 128);
+      }), transparent: true, depthWrite: false,
+    }));
+    coalGlow.scale.set(2.4, 1.2, 1);
+    coalGlow.position.set(0, 0.42, 0);
+    top.add(coalGlow);
     g.userData.coals = coals;
+    g.userData.coalGlow = coalGlow;
   }
   g.add(top);
   // nameplate kayu di depan meja stasiun (bukan melayang — tidak menutupi muka pelanggan)
@@ -530,7 +555,26 @@ export function buildWorld(scene) {
     bush.add(mesh(new THREE.SphereGeometry(0.55, 12, 10), std(0x22c55e), 0.5, 0.5, 0.15));
     scene.add(bush);
   }
-  // pot tanaman di sisi
+  // daun pisang + keranjang di sisi stan (detail lantai)
+  for (const sx of [-1, 1]) {
+    const leaves = new THREE.Group();
+    leaves.position.set(sx * 8.9, 0, -0.8);
+    for (let i = 0; i < 3; i++) {
+      const leaf = mesh(new THREE.ConeGeometry(0.5, 1.6, 6), std(0x16a34a, { roughness: 0.6 }), (i - 1) * 0.4, 0.7, 0);
+      leaf.scale.set(1, 1, 0.25);
+      leaf.rotation.z = (i - 1) * 0.5;
+      leaves.add(leaf);
+    }
+    scene.add(leaves);
+    const basket = new THREE.Group();
+    basket.position.set(sx * 8.2, 0, 2.4);
+    basket.add(mesh(new THREE.CylinderGeometry(0.5, 0.38, 0.45, 12), std(0x8a5a33), 0, 0.22, 0));
+    for (let i = 0; i < 5; i++) {
+      basket.add(mesh(new THREE.SphereGeometry(0.13, 10, 8), std(sx < 0 ? 0xdc2626 : 0x84cc16, { roughness: 0.35 }), (Math.random() - 0.5) * 0.55, 0.5, (Math.random() - 0.5) * 0.4));
+    }
+    scene.add(basket);
+  }
+  // pot tanaman + peti kayu di sisi
   for (const sx of [-1, 1]) {
     const pot = new THREE.Group();
     pot.position.set(sx * 8.6, 0, -2.5);
@@ -538,7 +582,6 @@ export function buildWorld(scene) {
     pot.add(mesh(new THREE.SphereGeometry(0.55, 12, 10), std(0x16a34a), 0, 0.9, 0));
     pot.add(mesh(new THREE.SphereGeometry(0.4, 12, 10), std(0x22c55e), 0.3, 0.75, 0.1));
     scene.add(pot);
-    // peti kayu
     const crate = new THREE.Group();
     crate.position.set(sx * 8.6, 0, 1.8);
     crate.add(mesh(new THREE.BoxGeometry(1.1, 0.7, 1.1), std(0x8a5a33), 0, 0.35, 0));
@@ -553,6 +596,12 @@ export function buildWorld(scene) {
   const lanternXs = [-6.8, -4.2, -1.4, 1.4, 4.2, 6.8];
   for (const x of lanternXs) {
     const l = makeLantern(x, 3.85, -2.7, 1.15);
+    scene.add(l);
+    refs.lanterns.push(l);
+  }
+  // lampion kecil di sisi (lebih banyak, lebih hangat)
+  for (const [x, y, z] of [[-8.6, 3.2, -2.0], [-3.5, 3.3, -2.1], [3.5, 3.3, -2.1], [8.6, 3.2, -2.0]]) {
+    const l = makeLantern(x, y, z, 0.7);
     scene.add(l);
     refs.lanterns.push(l);
   }

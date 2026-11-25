@@ -98,6 +98,10 @@
   #toast { position: absolute; left: 50%; top: 108px; transform: translateX(-50%) translateY(-8px); z-index: 30; background: rgba(15,10,4,.92); color: #fef3c7; border: 1px solid #f59e0b; border-radius: 20px; padding: 7px 18px; font-family: sans-serif; font-size: 14px; font-weight: bold; opacity: 0; pointer-events: none; transition: all .2s; white-space: nowrap; }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   #toast.good { border-color: #22c55e; color: #bbf7d0; }
+  .popup { position: absolute; transform: translate(-50%,-50%); font-family: sans-serif; font-weight: bold; font-size: 22px; color: #fde68a; text-shadow: 0 2px 0 #7c2d12, 0 0 14px rgba(251,191,36,.9); z-index: 25; pointer-events: none; white-space: nowrap; animation: floatUp 1.3s ease-out forwards; }
+  .popup.perfect { color: #fbbf24; font-size: 27px; }
+  .popup.combo { color: #86efac; font-size: 18px; }
+  @keyframes floatUp { 0% { opacity: 0; margin-top: 10px; } 15% { opacity: 1; } 100% { opacity: 0; margin-top: -70px; } }
 
   /* ---------- overlay ---------- */
   .overlay { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(10,4,2,.72); backdrop-filter: blur(2px); }

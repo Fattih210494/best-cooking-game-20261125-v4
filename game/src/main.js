@@ -102,6 +102,16 @@ function toast(msg, good = false) {
   clearTimeout(t._h);
   t._h = setTimeout(() => { t.className = ''; }, 1800);
 }
+// popup skor melayang (+295, PERFECT SEAR!, x4 COMBO)
+function spawnPopup(text, sx, sy, cls = '') {
+  const el = document.createElement('div');
+  el.className = 'popup ' + cls;
+  el.textContent = text;
+  el.style.left = sx + 'px';
+  el.style.top = sy + 'px';
+  $('#floatLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1400);
+}
 
 // ---------- HUD ----------
 function fmtTime(s) { s = Math.max(0, Math.ceil(s)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
@@ -380,7 +390,11 @@ function finishCook(id, quality) {
   W.plates[slot].add(food);
   W.plates[slot].userData.food = food;
   st.mode = 'idle'; st.dish = null; st.t = 0;
-  if (quality === 'perfect') toast('★ PERFECT SEAR! Wok Hei x' + S.wokHei, true);
+  if (quality === 'perfect') {
+    toast('★ PERFECT SEAR! Wok Hei x' + S.wokHei, true);
+    const sp = project(STATIONS.find((s) => s.id === id).x, 2.9, -1.6);
+    spawnPopup('★ PERFECT SEAR!', sp.x, sp.y, 'perfect');
+  }
   else if (quality === 'raw') toast('Kurang matang — tetap disajikan (poin 50%).');
   else toast(DISHES[dishId].name + ' siap di-plating!', true);
   renderPlating();
@@ -412,6 +426,11 @@ function serveDish(dishId, slot) {
   burstAt(c.x, 2.6, c.z - 0.5);
   const cust = W.customers[idx];
   cust.userData.happy = 0.6;
+  // popup skor di atas kepala pelanggan
+  const pp = project(c.x, 3.4, c.z - 0.5);
+  spawnPopup(`+${pts}`, pp.x, pp.y);
+  if (quality === 'perfect') spawnPopup('★ PERFECT SEAR!', pp.x, pp.y + 32, 'perfect');
+  if (S.combo >= 2) spawnPopup(`x${S.combo} COMBO`, pp.x, pp.y + 60, 'combo');
   sfxServe();
   toast(`+${pts} ${order.dish.name} tersaji! Combo x${S.combo}`, true);
   newOrder(idx);
@@ -540,30 +559,44 @@ function animate() {
   // lampion bergoyang + api berkedip
   for (const l of W.lanterns) l.rotation.z = Math.sin(t * 0.8 + l.userData.phase) * 0.06;
   lanternLight.intensity = 1.15 + Math.sin(t * 2.2) * 0.12;
-  fireLight.intensity = 1.2 + Math.sin(t * 11) * 0.35 + Math.sin(t * 23) * 0.15;
   for (const f of W.flames) {
     f.children.forEach((c, i) => { c.scale.y = 0.85 + Math.sin(t * 9 + i * 1.7) * 0.25; });
   }
-  for (const c of W.coals) c.children.forEach((b, i) => { b.material.emissiveIntensity = 0.9 + Math.sin(t * 3 + i) * 0.5; });
-  // pelanggan: napas + lambaian + senang
+  for (const c of W.coals) c.children.forEach((b, i) => { b.material.emissiveIntensity = 1.2 + Math.sin(t * 3 + i) * 0.6; });
+  const gg = W.stations.grill && W.stations.grill.userData.coalGlow;
+  if (gg) gg.material.opacity = 0.65 + Math.sin(t * 5) * 0.25;
+  fireLight.intensity = 1.8 + Math.sin(t * 11) * 0.5 + Math.sin(t * 23) * 0.2;
+  // pelanggan: napas + lambaian + senang + ekspresi ikut kesabaran
   W.customers.forEach((c, i) => {
     c.position.y = Math.sin(t * 1.4 + i * 1.3) * 0.03;
     c.userData.armR.rotation.z = (c.userData.armR.userData.baseZ ?? -0.6) + Math.sin(t * 2 + i) * 0.12;
+    // angguk pelan
+    c.rotation.x = Math.sin(t * 1.1 + i * 2) * 0.03;
     if (c.userData.happy > 0) {
       c.userData.happy -= dt;
       c.position.y += Math.sin(t * 14) * 0.05;
     }
     const o = S.orders[i];
+    // ekspresi: cemas saat kesabaran < 12 dtk (senyum -> cemberut, alis naik)
+    const face = c.userData.face;
+    if (face && face.userData.expr !== 'wow') {
+      const worried = !!(o && o.patience < 12 && S.phase === 'playing');
+      face.userData.smile.visible = !worried;
+      face.userData.frown.visible = worried;
+      for (const { m, sx } of face.userData.brows) m.rotation.z = sx * (worried ? -0.38 : -0.12);
+    }
     if (o && o.patience < 10) c.rotation.z = Math.sin(t * 8) * 0.02;
     else c.rotation.z = 0;
   });
-  // koki bergerak ke stasiun aktif + lebih hidup (ayun spatula besar, kepala miring)
+  // koki: mengaduk saat ada yang masak, melambai saat idle
   const chef = W.chef;
+  const anyCooking = STATIONS.some((s) => S.stations[s.id].mode === 'cooking');
   const dx = S.chefTargetX - chef.position.x;
   chef.position.x += dx * Math.min(1, dt * 4);
   chef.position.y = Math.abs(dx) > 0.05 ? Math.abs(Math.sin(t * 10)) * 0.08 : 0;
-  chef.userData.armR.rotation.z = -0.9 + Math.sin(t * 3) * 0.25;
+  chef.userData.armR.rotation.z = anyCooking ? -0.9 + Math.sin(t * 6) * 0.35 : -0.9 + Math.sin(t * 3) * 0.25;
   chef.rotation.z = Math.sin(t * 1.8) * 0.02;
+  chef.rotation.x = anyCooking ? 0.06 : 0;
 
   if (S.phase === 'playing') {
     S.timeLeft -= dt;
@@ -619,9 +652,10 @@ const params = new URLSearchParams(location.search);
 const shot = params.get('shot');
 if (shot === 'play') {
   startGame();
-  // preset seperti referensi: skor jalan, 1 wajan masak di zona perfect, 2 plating siap
-  S.score = 1640; S.combo = 3; S.bestCombo = 4; S.served = 6; S.timeLeft = 108;
+  // preset seperti referensi: skor jalan, 2 plating siap, wok + panci masak, popup skor
+  S.score = 1640; S.combo = 4; S.bestCombo = 4; S.served = 6; S.timeLeft = 108;
   S.stations.wok = { mode: 'cooking', dish: 'nasiGoreng', t: COOK_TIME * 0.68, quality: null };
+  S.stations.pot = { mode: 'cooking', dish: 'limeBroth', t: 2.5, quality: null };
   S.plating = ['nasiGoreng', 'chiliGreens'];
   for (const [i, d] of S.plating.entries()) {
     const food = makeFood(d);
@@ -632,6 +666,16 @@ if (shot === 'play') {
   }
   S.holding = ['lime', 'greens'];
   S.orders[0].patience = 22; S.orders[1].patience = 31; S.orders[2].patience = 12; S.orders[3].patience = 38;
+  // popup skor demo berulang supaya selalu tertangkap screenshot
+  const demoPopup = () => {
+    if (S.phase !== 'playing') return;
+    const dp = project(1.9, 3.4, -4.5);
+    spawnPopup('+270', dp.x, dp.y);
+    spawnPopup('★ PERFECT SEAR!', dp.x, dp.y + 32, 'perfect');
+    spawnPopup('x4 COMBO', dp.x, dp.y + 60, 'combo');
+  };
+  demoPopup();
+  setInterval(demoPopup, 1100);
   renderHUD();
 } else if (shot === 'end') {
   startGame();
