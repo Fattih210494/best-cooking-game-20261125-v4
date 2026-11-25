@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Lentera Rasa — Pasar Malam 3D</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #160a04; font-family: Georgia, 'Times New Roman', serif; }
+  #stage { position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px; transform: translate(-50%,-50%); overflow: hidden; background: #0b1e3a; }
+  #game { position: absolute; inset: 0; width: 1280px; height: 720px; display: block; }
+  #floatLayer { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+  .ic { width: 100%; height: 100%; display: block; }
+
+  /* ---------- HUD atas ---------- */
+  #hud { position: absolute; top: 0; left: 0; right: 0; height: 96px; z-index: 10;
+    display: flex; align-items: stretch; gap: 8px; padding: 6px 8px;
+    background: linear-gradient(180deg, #3f1d08 0%, #5b2d0e 55%, #3f1d08 100%);
+    border-bottom: 3px solid #fbbf24; box-shadow: 0 4px 14px rgba(0,0,0,.55); }
+  .hud-box { background: rgba(0,0,0,.28); border: 1px solid #a16207; border-radius: 8px; padding: 4px 10px; color: #fef3c7; }
+  #brand { min-width: 168px; display: flex; flex-direction: column; justify-content: center; }
+  #brand .logo { font-size: 21px; font-weight: bold; color: #fbbf24; letter-spacing: 1px; line-height: 1; }
+  #brand .shift { font-size: 11px; color: #fca5a5; letter-spacing: 1px; margin-top: 3px; font-family: sans-serif; font-weight: bold; }
+  #brand .time { font-size: 19px; font-weight: bold; color: #fff; margin-top: 3px; font-family: sans-serif; }
+  #brand .time.low { color: #ef4444; animation: blink .5s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .35; } }
+  #orders { flex: 1; display: flex; gap: 6px; }
+  .ocard { flex: 1; background: #fffbeb; border: 2px solid #d6a419; border-radius: 8px; padding: 3px 6px 4px; color: #451a03; position: relative; overflow: hidden; }
+  .ocard.warn { border-color: #f59e0b; }
+  .ocard.crit { border-color: #ef4444; animation: blink .5s steps(2) infinite; }
+  .oc-top { display: flex; justify-content: space-between; font-family: sans-serif; font-size: 10px; font-weight: bold; }
+  .oc-num { color: #92400e; } .oc-tag { color: #dc2626; } .oc-price { color: #15803d; }
+  .oc-body { display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+  .oc-body .ic { width: 34px; height: 34px; flex: none; }
+  .oc-name { font-size: 13px; font-weight: bold; line-height: 1.05; }
+  .oc-bar { height: 6px; background: #e7d8b0; border-radius: 3px; margin-top: 4px; overflow: hidden; }
+  .oc-bar div { height: 100%; background: #22c55e; border-radius: 3px; transition: width .3s linear; }
+  .ocard.warn .oc-bar div { background: #f59e0b; } .ocard.crit .oc-bar div { background: #ef4444; }
+  .oc-sec { position: absolute; right: 5px; bottom: 12px; font-family: sans-serif; font-size: 9px; color: #78350f; font-weight: bold; }
+  #stats { min-width: 210px; display: flex; flex-direction: column; gap: 3px; }
+  #stats .row { display: flex; gap: 6px; }
+  .stat { flex: 1; text-align: center; }
+  .stat b { display: block; font-size: 17px; color: #fff; font-family: sans-serif; }
+  .stat span { font-size: 9px; letter-spacing: 1px; color: #fcd34d; font-family: sans-serif; font-weight: bold; }
+  #stats .btns { display: flex; gap: 4px; }
+  .hbtn { flex: 1; font-family: sans-serif; font-size: 11px; font-weight: bold; color: #451a03; background: #fbbf24; border: none; border-radius: 6px; padding: 4px 0; cursor: pointer; }
+  .hbtn:hover { background: #fde68a; }
+  #pauseBtn { flex: none; width: 34px; }
+
+  /* ---------- chip timing & bubble pelanggan ---------- */
+  .station-chip { position: absolute; width: 140px; text-align: center; z-index: 6; pointer-events: none; }
+  .sc-label { display: inline-block; font-family: sans-serif; font-size: 11px; font-weight: bold; color: #fff; background: rgba(15,23,42,.85); border: 1px solid #f59e0b; border-radius: 10px; padding: 2px 8px; }
+  .sc-label.gold { background: #b45309; border-color: #fde68a; color: #fef3c7; }
+  .sc-label.ready { background: #15803d; border-color: #86efac; }
+  .sc-bar { position: relative; height: 9px; background: rgba(0,0,0,.65); border: 1px solid #fbbf24; border-radius: 5px; margin-top: 3px; overflow: hidden; }
+  .sc-zone { position: absolute; top: 0; bottom: 0; background: rgba(251,191,36,.85); }
+  .sc-needle { position: absolute; top: -2px; bottom: -2px; width: 3px; background: #fff; box-shadow: 0 0 4px #fff; }
+  .cust-bubble { position: absolute; width: 60px; height: 60px; border-radius: 50%; background: #fffbeb; border: 4px solid #22c55e; display: none; align-items: center; justify-content: center; z-index: 6; pointer-events: none; box-shadow: 0 3px 8px rgba(0,0,0,.5); }
+  .cust-bubble .ic { width: 46px; height: 46px; }
+  .cust-bubble::after { content: ''; position: absolute; bottom: -9px; left: 50%; margin-left: -6px; border: 6px solid transparent; border-top-color: #fffbeb; border-bottom: none; }
+
+  /* ---------- panel bawah ---------- */
+  #bottomPanel { position: absolute; left: 0; right: 0; bottom: 22px; height: 168px; z-index: 10; display: flex; gap: 8px; padding: 8px;
+    background: linear-gradient(180deg, #5b2d0e, #3f1d08); border-top: 3px solid #fbbf24; box-shadow: 0 -4px 14px rgba(0,0,0,.5); }
+  #ingredients { display: grid; grid-template-columns: repeat(4, 118px); grid-template-rows: repeat(2, 72px); gap: 6px; }
+  .ing-tile { background: #fffbeb; border: 2px solid #a16207; border-radius: 8px; cursor: pointer; position: relative; display: flex; flex-direction: column; align-items: center; padding: 3px; }
+  .ing-tile:hover { border-color: #f59e0b; transform: translateY(-2px); }
+  .ing-tile:active { transform: translateY(1px); }
+  .ing-tile .key { position: absolute; top: 2px; left: 5px; font-family: sans-serif; font-size: 10px; font-weight: bold; color: #92400e; background: #fde68a; border-radius: 4px; padding: 1px 5px; }
+  .ing-tile .ic { width: 40px; height: 40px; }
+  .ing-tile .nm { font-size: 12px; font-weight: bold; color: #451a03; }
+  #plating { flex: 1; display: flex; gap: 8px; }
+  .plate-slot { flex: 1; background: #fef3c7; border: 2px dashed #a16207; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px; color: #451a03; }
+  .plate-slot.ready { border: 2px solid #22c55e; background: #f0fdf4; }
+  .plate-slot .ic { width: 74px; height: 74px; }
+  .ps-label { font-family: sans-serif; font-size: 11px; font-weight: bold; color: #15803d; }
+  .plate-slot.empty .ps-label { color: #92400e; }
+  .ps-name { font-size: 13px; font-weight: bold; }
+  .ps-empty { font-size: 13px; color: #a16207; margin-top: 6px; }
+  #sideBtns { display: flex; flex-direction: column; gap: 6px; width: 108px; }
+  #bellBtn { flex: 1; background: linear-gradient(180deg, #fde68a, #f59e0b); border: 2px solid #92400e; border-radius: 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #bellBtn:hover { filter: brightness(1.1); }
+  #bellBtn .ic { width: 52px; height: 52px; }
+  #bellBtn span { font-family: sans-serif; font-size: 10px; font-weight: bold; color: #451a03; }
+  #binBtn { background: #7f1d1d; color: #fecaca; border: 2px solid #450a0a; border-radius: 8px; font-family: sans-serif; font-size: 11px; font-weight: bold; padding: 6px 0; cursor: pointer; }
+  #binBtn.has { background: #b91c1c; }
+  #footer { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; z-index: 10; display: flex; align-items: center; gap: 14px; padding: 0 10px;
+    background: #1c0a03; color: #fcd34d; font-family: sans-serif; font-size: 11px; }
+  #holding { display: flex; gap: 5px; align-items: center; min-width: 340px; }
+  .hold-chip { background: #78350f; color: #fef3c7; border-radius: 10px; padding: 1px 8px; display: inline-flex; align-items: center; gap: 3px; font-size: 11px; }
+  .hold-chip .ic { width: 15px; height: 15px; }
+  .hold-chip.sambal { background: #b91c1c; }
+  .hold-empty { color: #a16207; }
+  #hint { margin-left: auto; color: #d6a419; }
+
+  /* ---------- toast ---------- */
+  #toast { position: absolute; left: 50%; top: 108px; transform: translateX(-50%) translateY(-8px); z-index: 30; background: rgba(15,10,4,.92); color: #fef3c7; border: 1px solid #f59e0b; border-radius: 20px; padding: 7px 18px; font-family: sans-serif; font-size: 14px; font-weight: bold; opacity: 0; pointer-events: none; transition: all .2s; white-space: nowrap; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.good { border-color: #22c55e; color: #bbf7d0; }
+
+  /* ---------- overlay ---------- */
+  .overlay { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(10,4,2,.72); backdrop-filter: blur(2px); }
+  .overlay.hidden { display: none; }
+  .panel { background: #fff7e6; border: 4px solid #92400e; border-radius: 14px; padding: 22px 28px; max-width: 860px; width: 92%; color: #451a03; box-shadow: 0 12px 40px rgba(0,0,0,.6); text-align: center; }
+  .panel h1 { font-size: 44px; color: #b45309; letter-spacing: 2px; }
+  .panel h2 { font-size: 15px; color: #92400e; font-family: sans-serif; letter-spacing: 2px; margin: 4px 0 12px; }
+  .panel p { font-size: 15px; line-height: 1.5; margin-bottom: 10px; }
+  .howto { display: flex; gap: 10px; margin: 12px 0; text-align: left; }
+  .howto div { flex: 1; background: #fef3c7; border: 1px solid #d6a419; border-radius: 8px; padding: 10px; font-size: 13px; line-height: 1.45; }
+  .howto b { display: block; font-size: 14px; margin-bottom: 3px; color: #92400e; }
+  .bigbtn { font-family: Georgia, serif; font-size: 21px; font-weight: bold; color: #fff; background: linear-gradient(180deg, #dc2626, #991b1b); border: 2px solid #7f1d1d; border-radius: 12px; padding: 12px 34px; cursor: pointer; letter-spacing: 1px; }
+  .bigbtn:hover { filter: brightness(1.15); }
+  .bigbtn.gold { background: linear-gradient(180deg, #f59e0b, #b45309); border-color: #92400e; }
+  .statgrid { display: flex; gap: 10px; justify-content: center; margin: 14px 0; }
+  .statgrid div { background: #fef3c7; border: 1px solid #d6a419; border-radius: 8px; padding: 10px 16px; min-width: 110px; }
+  .statgrid b { display: block; font-size: 24px; color: #92400e; font-family: sans-serif; }
+  .statgrid span { font-size: 11px; letter-spacing: 1px; color: #78350f; font-family: sans-serif; font-weight: bold; }
+  #endTitle { font-size: 40px; }
+  /* menu overlay */
+  #menuOverlay .panel { max-width: 1060px; padding: 16px 20px; text-align: left; }
+  .menu-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .menu-head h1 { font-size: 26px; }
+  .menu-cols { display: flex; gap: 14px; }
+  .menu-col { flex: 1; }
+  .menu-col h3 { font-size: 15px; color: #92400e; border-bottom: 2px solid #d6a419; padding-bottom: 4px; margin-bottom: 8px; font-family: sans-serif; letter-spacing: 1px; }
+  .craft { display: flex; align-items: center; gap: 8px; background: #fef3c7; border: 1px solid #e7d8b0; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px; font-size: 13px; }
+  .craft .ic { width: 34px; height: 34px; flex: none; }
+  .craft b { color: #92400e; }
+  .craft .arrow { color: #b45309; font-weight: bold; }
+  .craft .bonus { margin-left: auto; font-family: sans-serif; font-size: 11px; font-weight: bold; color: #15803d; background: #dcfce7; border-radius: 8px; padding: 2px 7px; white-space: nowrap; }
+  .dishgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .dishcard { display: flex; align-items: center; gap: 8px; background: #fffbeb; border: 1px solid #d6a419; border-radius: 8px; padding: 5px 8px; }
+  .dishcard .ic { width: 44px; height: 44px; flex: none; }
+  .dishcard .dn { font-size: 14px; font-weight: bold; }
+  .dishcard .di { font-size: 11px; color: #78350f; font-family: sans-serif; }
+  .dishcard .dp { margin-left: auto; font-family: sans-serif; font-weight: bold; color: #15803d; font-size: 14px; white-space: nowrap; }
+  .dishcard.feast { background: linear-gradient(180deg, #fef9c3, #fde68a); border-color: #f59e0b; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game" width="1280" height="720"></canvas>
+  <div id="floatLayer"></div>
+
+  <div id="hud">
+    <div class="hud-box" id="brand">
+      <div class="logo">🔥 LENTERA RASA</div>
+      <div class="shift" id="shiftName">SHIFT 2 - LANTERN RUSH</div>
+      <div class="time">TIME <span id="time">02:30</span></div>
+    </div>
+    <div id="orders"></div>
+    <div class="hud-box" id="stats">
+      <div class="row">
+        <div class="stat"><b id="score">0</b><span>SCORE</span></div>
+        <div class="stat"><b id="combo">x0</b><span>COMBO</span></div>
+        <div class="stat"><b id="plates">0/10</b><span>PLATES</span></div>
+      </div>
+      <div class="btns">
+        <button class="hbtn" id="menuBtn">MENU</button>
+        <button class="hbtn" id="sfxBtn">SFX ON</button>
+        <button class="hbtn" id="shiftBtn">SHIFT</button>
+        <button class="hbtn" id="pauseBtn">II</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bottomPanel">
+    <div id="ingredients">
+      <div class="ing-tile" data-id="rice"><span class="key">1</span><svg class="ic"><use href="#ic-rice"/></svg><span class="nm">Rice</span></div>
+      <div class="ing-tile" data-id="noodles"><span class="key">2</span><svg class="ic"><use href="#ic-noodles"/></svg><span class="nm">Noodles</span></div>
+      <div class="ing-tile" data-id="satay"><span class="key">3</span><svg class="ic"><use href="#ic-satay"/></svg><span class="nm">Satay</span></div>
+      <div class="ing-tile" data-id="greens"><span class="key">4</span><svg class="ic"><use href="#ic-greens"/></svg><span class="nm">Greens</span></div>
+      <div class="ing-tile" data-id="egg"><span class="key">5</span><svg class="ic"><use href="#ic-egg"/></svg><span class="nm">Egg</span></div>
+      <div class="ing-tile" data-id="chili"><span class="key">6</span><svg class="ic"><use href="#ic-chili"/></svg><span class="nm">Chili</span></div>
+      <div class="ing-tile" data-id="broth"><span class="key">7</span><svg class="ic"><use href="#ic-broth"/></svg><span class="nm">Broth</span></div>
+      <div class="ing-tile" data-id="lime"><span class="key">8</span><svg class="ic"><use href="#ic-lime"/></svg><span class="nm">Lime</span></div>
+    </div>
+    <div id="plating"></div>
+    <div id="sideBtns">
+      <button id="bellBtn"><svg class="ic"><use href="#ic-bell"/></svg><span>SERVE BELL [F]</span></button>
+      <button id="binBtn">🗑 BIN [X]</button>
+    </div>
+  </div>
+  <div id="footer">
+    <span>HOLDING:</span><span id="holding"></span>
+    <span id="hint">Grab [1-8] • Cook: klik stasiun • Pull: klik lagi di zona emas • Serve [F] • Menu [M]</span>
+  </div>
+
+  <div id="toast"></div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="panel">
+      <h1>🔥 LENTERA RASA 🔥</h1>
+      <h2>PASAR MALAM 3D &nbsp;•&nbsp; SHIFT 2 — LANTERN RUSH</h2>
+      <p>Stan masakan Indonesia di tengah pasar malam. Lampion menyala, wajan berapi — sajikan pesanan sebelum pelanggan kehabisan sabar!</p>
+      <div class="howto">
+        <div><b>1. AMBIL BAHAN</b>Klik nampan atau tombol 1–8. Tangan muat 3 bahan. Chili bisa ditumbuk di Mortar jadi Sambal (+50).</div>
+        <div><b>2. MASAK + TIMING</b>Klik stasiun (Wok / Panci / Grill). Klik lagi untuk PULL — tepat di zona emas = PERFECT SEAR, poin 1,5x!</div>
+        <div><b>3. PLATING + BEL</b>Hidangan matang masuk plating. Bunyikan bel [F] atau klik pelanggan untuk menyajikan. Target: <b>1.500 poin / 10 piring</b> dalam 2:30!</div>
+      </div>
+      <button class="bigbtn" id="startBtn">▶ &nbsp;MULAI SHIFT</button>
+      <p style="margin-top:10px;font-size:13px;color:#78350f">Buku Menu (M) berisi 8 resep: Nasi Goreng, Satay Platter, Volcano Mee, Lime Broth, Chili Greens, Soy Noodles, Ember Laksa, Sultan Feast.</p>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="menuOverlay">
+    <div class="panel">
+      <div class="menu-head">
+        <h1>📖 Buku Menu &amp; Log Shift</h1>
+        <button class="bigbtn gold" id="closeMenuBtn" style="font-size:15px;padding:8px 18px">← KEMBALI KE DAPUR</button>
+      </div>
+      <div class="menu-cols">
+        <div class="menu-col">
+          <h3>🌶 SPICE CRAFT — CARA MASAK</h3>
+          <div class="craft"><svg class="ic"><use href="#ic-chili"/></svg><b>Sambal Paste</b><span class="arrow">→ MORTAR →</span><span>🌶 Sambal siap</span><span class="bonus">+50 / HIDANGAN</span></div>
+          <div class="craft"><svg class="ic"><use href="#ic-lime"/></svg><b>Lime-Herb Paste</b><span class="arrow">→ MORTAR →</span><span>🍋‍🟩 Perasan jeruk</span><span class="bonus">+25 / HIDANGAN</span></div>
+          <div class="craft"><svg class="ic"><use href="#ic-satay"/></svg><b>Charcoal Satay Sear</b><span class="arrow">→ GRILL →</span><span>🔥 Sate arang</span><span class="bonus">PERFECT +50%</span></div>
+          <div class="craft"><svg class="ic"><use href="#ic-rice"/></svg><b>Wok Hei Golden Sear</b><span class="arrow">→ WOK →</span><span>🍳 Nasi goreng api</span><span class="bonus">PERFECT +50%</span></div>
+          <h3 style="margin-top:12px">📋 SHIFT 2 — LANTERN RUSH</h3>
+          <div class="statgrid" id="menuStats" style="margin:0"></div>
+          <p style="font-size:13px;margin-top:10px">Target shift: <b>1.500 poin</b> atau <b>10 piring</b> dalam 2:30. Pesanan yang kehabisan sabar mereset combo. Pull di zona emas menaikkan Wok Hei!</p>
+        </div>
+        <div class="menu-col">
+          <h3>🍜 ILLUSTRATED MENU — 8 HIDANGAN</h3>
+          <div class="dishgrid">
+            <div class="dishcard"><svg class="ic"><use href="#ic-nasiGoreng"/></svg><div><div class="dn">Nasi Goreng</div><div class="di">Rice • Egg • Chili — Wok</div></div><span class="dp">+180</span></div>
+            <div class="dishcard"><svg class="ic"><use href="#ic-satayPlatter"/></svg><div><div class="dn">Satay Platter</div><div class="di">Satay • Chili • Lime — Grill</div></div><span class="dp">+170</span></div>
+            <div class="dishcard"><svg class="ic"><use href="#ic-volcanoMee"/></svg><div><div class="dn">Volcano Mee</div><div class="di">Noodles • Chili • Egg — Wok</div></div><span class="dp">+220</span></div>
+            <div class="dishcard"><svg class="ic"><use href="#ic-limeBroth"/></svg><div><div class="dn">Lime Broth</div><div class="di">Broth • Greens • Lime — Pot</div></div><span class="dp">+190</span></div>
+            <div class="dishcard"><svg class="ic"><use href="#ic-chiliGreens"/></svg><div><div class="dn">Chili Greens</div><div class="di">Greens • Chili • Lime — Pot</div></div><span class="dp">+150</span></div>
+            <div class="dishcard"><svg class="ic"><use href="#ic-soyNoodles"/></svg><div><div class="dn">Soy Noodles</div><div class="di">Noodles • Egg • Greens — Wok</div></div><span class="dp">+165</span></div>
+            <div class="dishcard"><svg class="ic"><use href="#ic-emberLaksa"/></svg><div><div class="dn">Ember Laksa</div><div class="di">Broth • Noodles • Satay — Pot</div></div><span class="dp">+260</span></div>
+            <div class="dishcard feast"><svg class="ic"><use href="#ic-sultanFeast"/></svg><div><div class="dn">Sultan Feast 👑</div><div class="di">Satay • Rice • Egg — Grill</div></div><span class="dp">+340</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="endOverlay">
+    <div class="panel">
+      <h1 id="endTitle">★ SHIFT SELESAI! ★</h1>
+      <p id="endSub"></p>
+      <div class="statgrid" id="endStats"></div>
+      <button class="bigbtn gold" id="againBtn">🔄 &nbsp;MAIN LAGI</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ikon SVG (buatan sendiri) ============ -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="ic-rice" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="46" rx="22" ry="12" fill="#2f6fb2"/><ellipse cx="32" cy="42" rx="22" ry="12" fill="#3b82c4"/>
+      <ellipse cx="32" cy="38" rx="18" ry="10" fill="#fff8ee"/>
+      <circle cx="24" cy="34" r="3" fill="#fff8ee"/><circle cx="34" cy="32" r="3.4" fill="#fff8ee"/><circle cx="40" cy="36" r="2.6" fill="#fff8ee"/>
+      <rect x="44" y="12" width="4" height="30" rx="2" fill="#8a5a33" transform="rotate(18 46 27)"/>
+      <rect x="50" y="12" width="4" height="30" rx="2" fill="#a9743f" transform="rotate(18 52 27)"/>
+    </symbol>
+    <symbol id="ic-noodles" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="46" rx="22" ry="12" fill="#7c2d12"/><ellipse cx="32" cy="42" rx="22" ry="12" fill="#9a3412"/>
+      <path d="M16 40 q6 -8 12 0 q6 8 12 0 q6 -8 12 0" stroke="#fbbf24" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M20 34 q6 -6 12 0 q6 6 12 0" stroke="#fde68a" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <circle cx="44" cy="30" r="4" fill="#22c55e"/>
+    </symbol>
+    <symbol id="ic-satay" viewBox="0 0 64 64">
+      <rect x="10" y="28" width="44" height="4" rx="2" fill="#d9a066"/>
+      <rect x="16" y="20" width="12" height="10" rx="3" fill="#92400e"/><rect x="30" y="20" width="12" height="10" rx="3" fill="#b45309"/><rect x="44" y="20" width="8" height="10" rx="3" fill="#92400e"/>
+      <rect x="10" y="40" width="44" height="4" rx="2" fill="#d9a066"/>
+      <rect x="18" y="32" width="12" height="10" rx="3" fill="#b45309"/><rect x="32" y="32" width="12" height="10" rx="3" fill="#92400e"/>
+      <circle cx="52" cy="52" r="5" fill="#b45309"/>
+    </symbol>
+    <symbol id="ic-greens" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="34" rx="14" ry="18" fill="#16a34a" transform="rotate(-18 32 34)"/>
+      <ellipse cx="32" cy="34" rx="14" ry="18" fill="#22c55e" transform="rotate(20 32 34)"/>
+      <path d="M32 16 L32 52" stroke="#15803d" stroke-width="3"/>
+      <circle cx="46" cy="46" r="6" fill="#4ade80"/><circle cx="18" cy="48" r="5" fill="#86efac"/>
+    </symbol>
+    <symbol id="ic-egg" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="34" rx="24" ry="18" fill="#fff7d6"/>
+      <ellipse cx="32" cy="34" rx="24" ry="18" fill="none" stroke="#fde68a" stroke-width="2"/>
+      <circle cx="32" cy="34" r="11" fill="#f59e0b"/><circle cx="29" cy="31" r="4" fill="#fbbf24"/>
+    </symbol>
+    <symbol id="ic-chili" viewBox="0 0 64 64">
+      <path d="M18 22 Q10 44 30 50 Q50 54 52 34 Q53 24 44 22 Q30 20 18 22" fill="#dc2626"/>
+      <path d="M18 22 Q14 36 26 46" stroke="#ef4444" stroke-width="3" fill="none"/>
+      <path d="M44 22 Q50 12 56 12 Q54 20 48 24" fill="#16a34a"/>
+      <circle cx="24" cy="34" r="3" fill="#f87171"/>
+    </symbol>
+    <symbol id="ic-broth" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="46" rx="22" ry="12" fill="#0e7490"/><ellipse cx="32" cy="42" rx="22" ry="12" fill="#0891b2"/>
+      <ellipse cx="32" cy="40" rx="17" ry="8" fill="#a3e635"/>
+      <circle cx="26" cy="38" r="3" fill="#16a34a"/><circle cx="38" cy="39" r="3" fill="#22c55e"/>
+      <path d="M24 26 q3 -6 0 -10 M34 26 q3 -6 0 -10 M44 28 q3 -6 0 -10" stroke="#e0f2fe" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <circle cx="46" cy="46" r="6" fill="#bef264" stroke="#65a30d" stroke-width="2"/>
+    </symbol>
+    <symbol id="ic-lime" viewBox="0 0 64 64">
+      <circle cx="32" cy="34" r="22" fill="#65a30d"/>
+      <circle cx="32" cy="34" r="18" fill="#bef264"/>
+      <circle cx="32" cy="34" r="14" fill="#d9f99d"/>
+      <path d="M32 20 L32 48 M18 34 L46 34 M22 24 L42 44 M42 24 L22 44" stroke="#65a30d" stroke-width="2"/>
+      <path d="M32 14 Q36 6 44 8 Q40 14 34 15" fill="#16a34a"/>
+    </symbol>
+    <symbol id="ic-bell" viewBox="0 0 64 64">
+      <path d="M32 8 Q12 8 12 30 L12 44 L52 44 L52 30 Q52 8 32 8" fill="#fbbf24" stroke="#92400e" stroke-width="3"/>
+      <rect x="8" y="44" width="48" height="6" rx="3" fill="#92400e"/>
+      <circle cx="32" cy="56" r="5" fill="#78350f"/>
+      <circle cx="20" cy="20" r="4" fill="#fef3c7" opacity=".8"/>
+    </symbol>
+    <symbol id="ic-nasiGoreng" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="44" rx="26" ry="12" fill="#fff"/><ellipse cx="32" cy="44" rx="26" ry="12" fill="none" stroke="#d6a419" stroke-width="2"/>
+      <ellipse cx="32" cy="38" rx="19" ry="11" fill="#f59e0b"/>
+      <circle cx="26" cy="34" r="3" fill="#fde68a"/><circle cx="38" cy="36" r="3" fill="#92400e"/><circle cx="32" cy="30" r="2.5" fill="#dc2626"/>
+      <ellipse cx="40" cy="30" rx="8" ry="5" fill="#fff7d6"/><circle cx="40" cy="30" r="3" fill="#f59e0b"/>
+      <path d="M48 18 q4 -6 10 -6" stroke="#16a34a" stroke-width="3" fill="none"/>
+    </symbol>
+    <symbol id="ic-satayPlatter" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="46" rx="26" ry="11" fill="#f5e6c8" stroke="#d6a419" stroke-width="2"/>
+      <rect x="12" y="26" width="40" height="4" rx="2" fill="#d9a066"/>
+      <rect x="16" y="18" width="10" height="9" rx="3" fill="#92400e"/><rect x="28" y="18" width="10" height="9" rx="3" fill="#b45309"/><rect x="40" y="18" width="10" height="9" rx="3" fill="#92400e"/>
+      <circle cx="50" cy="48" r="7" fill="#b45309"/><circle cx="50" cy="48" r="3.5" fill="#d97706"/>
+      <circle cx="16" cy="50" r="4" fill="#bef264"/>
+    </symbol>
+    <symbol id="ic-volcanoMee" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="46" rx="22" ry="12" fill="#7c2d12"/><ellipse cx="32" cy="42" rx="22" ry="12" fill="#9a3412"/>
+      <path d="M16 40 q6 -8 12 0 q6 8 12 0 q6 -8 12 0" stroke="#fbbf24" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M28 20 L32 8 L36 20 Q40 28 32 34 Q24 28 28 20" fill="#ef4444"/>
+      <path d="M30 22 L32 14 L34 22 Q36 26 32 28 Q28 26 30 22" fill="#fbbf24"/>
+    </symbol>
+    <symbol id="ic-limeBroth" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="46" rx="22" ry="12" fill="#0e7490"/><ellipse cx="32" cy="42" rx="22" ry="12" fill="#0891b2"/>
+      <ellipse cx="32" cy="40" rx="17" ry="8" fill="#a3e635"/>
+      <circle cx="24" cy="38" r="3.5" fill="#16a34a"/><circle cx="38" cy="38" r="3.5" fill="#22c55e"/>
+      <circle cx="46" cy="32" r="7" fill="#bef264" stroke="#65a30d" stroke-width="2"/>
+      <path d="M24 26 q3 -6 0 -10 M36 26 q3 -6 0 -10" stroke="#e0f2fe" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="ic-chiliGreens" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="46" rx="22" ry="11" fill="#166534"/><ellipse cx="32" cy="42" rx="22" ry="11" fill="#15803d"/>
+      <ellipse cx="26" cy="36" rx="10" ry="7" fill="#22c55e" transform="rotate(-20 26 36)"/>
+      <ellipse cx="40" cy="36" rx="10" ry="7" fill="#4ade80" transform="rotate(18 40 36)"/>
+      <path d="M20 32 Q14 44 22 48" stroke="#dc2626" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M44 32 Q50 44 42 48" stroke="#ef4444" stroke-width="5" fill="none" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="ic-soyNoodles" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="46" rx="22" ry="12" fill="#451a03"/><ellipse cx="32" cy="42" rx="22" ry="12" fill="#78350f"/>
+      <path d="M16 40 q6 -8 12 0 q6 8 12 0 q6 -8 12 0" stroke="#d97706" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M20 34 q6 -6 12 0 q6 6 12 0" stroke="#f59e0b" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <ellipse cx="42" cy="30" rx="7" ry="4.5" fill="#fff7d6"/><circle cx="42" cy="30" r="2.5" fill="#f59e0b"/>
+    </symbol>
+    <symbol id="ic-emberLaksa" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="46" rx="22" ry="12" fill="#9a3412"/><ellipse cx="32" cy="42" rx="22" ry="12" fill="#c2410c"/>
+      <ellipse cx="32" cy="40" rx="17" ry="8" fill="#ea580c"/>
+      <path d="M18 38 q5 -6 10 0 q5 6 10 0 q5 -6 10 0" stroke="#fde68a" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <circle cx="44" cy="30" r="4" fill="#92400e"/>
+      <path d="M28 20 L32 10 L36 20 Q38 26 32 28 Q26 26 28 20" fill="#f97316"/>
+    </symbol>
+    <symbol id="ic-sultanFeast" viewBox="0 0 64 64">
+      <ellipse cx="32" cy="46" rx="27" ry="12" fill="#b45309"/><ellipse cx="32" cy="42" rx="27" ry="12" fill="#d97706"/>
+      <ellipse cx="32" cy="42" rx="27" ry="12" fill="none" stroke="#fbbf24" stroke-width="2"/>
+      <ellipse cx="24" cy="38" rx="12" ry="7" fill="#f59e0b"/>
+      <rect x="38" y="30" width="12" height="8" rx="3" fill="#92400e"/>
+      <ellipse cx="48" cy="30" rx="6" ry="4" fill="#fff7d6"/><circle cx="48" cy="30" r="2" fill="#f59e0b"/>
+      <path d="M28 14 L30 20 L36 20 L31 24 L33 30 L28 26 L23 30 L25 24 L20 20 L26 20 Z" fill="#fbbf24"/>
+    </symbol>
+  </defs>
+</svg>
+
+<script src="vendor/three.min.js"></script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
